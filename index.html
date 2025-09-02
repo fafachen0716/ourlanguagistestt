@@ -668,7 +668,7 @@ footer a, footer span {
           start_time: c["開始時間 from"],
           end_time: c["結束時間 to"],
           city: c["活動城市 city"],
-          address: c["活動地址 address"],
+          address: c["活動地址 address"] ? `"${c["活動地址 address"].replace(/"/g, '""')}"` : '',
           description: c["活動描述 description"],
           fee: c["費用 fee (TWD)"],
           signup_url: c["報名連結 sign up"],
