@@ -517,8 +517,19 @@ footer a, footer span {
 
   // ======= 線下活動：地圖標記與卡片 =======
   for(const r of offline){
-    const marker = addMarker(r); r._marker = marker; markers.push(marker); cluster.addLayer(marker);
+    // 只在有經緯度時才新增 marker
+    let marker = null;
+    const lat = parseFloat(r.lat);
+    const lng = parseFloat(r.lng);
 
+    if (!isNaN(lat) && !isNaN(lng)) {
+        marker = addMarker(r);
+        r._marker = marker;
+        markers.push(marker);
+        cluster.addLayer(marker);
+    }
+
+    // 建立卡片
     const card = document.createElement('div'); 
     card.className = 'card';
     card.innerHTML = `
@@ -529,10 +540,23 @@ footer a, footer span {
       <div class="meta">${r.city || ''}・${r.date || ''} ${r.start_time? '• '+r.start_time: ''}</div>
       <div class="meta">語言：${r.languages || '—'}｜費用：${fmtCurrency(r.fee)}</div>
     `;
-    card.addEventListener('click', ()=>{ map.setView([+r.lat, +r.lng], 15); marker.openPopup(); });
-    card.querySelector('.fav').addEventListener('click', ev=>{ ev.stopPropagation(); toggleFav(r.id); renderList(); });
+    
+    card.addEventListener('click', ()=>{
+        if (marker) {  // 只有 marker 存在時才置中
+            map.setView([lat, lng], 15);
+            marker.openPopup();
+        }
+    });
+    
+    card.querySelector('.fav').addEventListener('click', ev=>{
+        ev.stopPropagation(); 
+        toggleFav(r.id); 
+        renderList();
+    });
+    
     $('#cards').appendChild(card);
-  }
+}
+
 
     // ======= 線上活動：單獨列表顯示 =======
     if(online.length){
