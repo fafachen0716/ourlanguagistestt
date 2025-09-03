@@ -276,22 +276,10 @@ footer a, footer span {
           <input id="q" type="search" placeholder="搜尋：活動名稱 / 城市 / 語言" />
           <button class="btn" id="btnClear"><i class="ti ti-x"></i>清除</button>
         </div>
-        <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:0.6rem;">
-          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-            <label class="toggle"><input type="checkbox" id="toggleThisWeek"> 只看「本週」</label>
-            <span class="badge" id="thisWeekBadge">本週區間載入中…</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-            <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
-            <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-            <label>自訂區間：</label>
-            <input type="date" id="customStart">
-            <input type="date" id="customEnd">
-            <button class="btn" id="btnApplyCustom">套用</button>
-          </div>
-        </div>        
+        <div style="margin-top:.6rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
+          <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
+        </div>
       </div>
 
       <div class="section">
@@ -362,76 +350,6 @@ footer a, footer span {
   const fmtBadge = (d) => d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'})
   $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
 
-
-  function getThisWeekRange(){
-  const now = new Date();
-  const tzNow = new Date(now.toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
-  const day = tzNow.getDay(); // 0=Sun..6=Sat
-  const thisMon = new Date(tzNow); 
-  thisMon.setDate(tzNow.getDate() - ((day+6)%7)); // 找到本週一
-  thisMon.setHours(0,0,0,0);
-  const thisSun = new Date(thisMon);
-  thisSun.setDate(thisMon.getDate()+6);
-  thisSun.setHours(23,59,59,999);
-  return {start:thisMon, end:thisSun};
-  }
-
-  function filterEventsByDateRange(start, end){
-    console.log("📅 篩選日期區間：", start.toISOString(), "～", end.toISOString());
-    const filtered = allEvents.filter(ev=>{
-      const d = toDate(ev.date);
-      return d >= start && d <= end;
-    });
-    console.log("✅ 篩選後活動數量：", filtered.length);
-    renderEvents(filtered);
-  }
-
-  const thisWeek = getThisWeekRange();
-  $('#thisWeekBadge').textContent = `本週：${fmtBadge(thisWeek.start)}–${fmtBadge(thisWeek.end)}`;
-  $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
-
-  // 綁定事件
-  $('#toggleThisWeek').addEventListener('change', e=>{
-    if(e.target.checked){
-      $('#toggleNextWeek').checked = false;
-      filterEventsByDateRange(thisWeek.start, thisWeek.end);
-    } else {
-      // 如果兩個都沒勾 → 顯示全部
-      if(!$('#toggleThisWeek').checked && !$('#toggleNextWeek').checked){
-        renderEvents(allEvents);
-      }
-    }
-  });
-
-  $('#toggleNextWeek').addEventListener('change', e=>{
-    if(e.target.checked){
-      $('#toggleThisWeek').checked = false;
-      filterEventsByDateRange(nextWeek.start, nextWeek.end);
-    } else {
-      // 如果兩個都沒勾 → 顯示全部
-      if(!$('#toggleThisWeek').checked && !$('#toggleNextWeek').checked){
-        renderEvents(allEvents);
-      }
-    }
-  });
-
-
-  $('#btnApplyCustom').addEventListener('click', ()=>{
-    const startVal = $('#customStart').value;
-    const endVal = $('#customEnd').value;
-    if(!startVal || !endVal){
-      alert("請選擇開始與結束日期！");
-      return;
-    }
-    const start = new Date(startVal+'T00:00:00+08:00');
-    const end = new Date(endVal+'T23:59:59+08:00');
-    $('#toggleThisWeek').checked = false;
-    $('#toggleNextWeek').checked = false;
-    filterEventsByDateRange(start, end);
-  });
-
-
-
   // ======= 🗺️ Leaflet 地圖與底圖 =======
   const isMobile = window.innerWidth < 768;
 
@@ -474,7 +392,7 @@ footer a, footer span {
   map.setView([23.7, 121.0], 7);
 
   // 群聚
-  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 25 });
+  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 30 });
   map.addLayer(cluster);
 
   // ======= ⭐ 我的最愛（localStorage） =======
