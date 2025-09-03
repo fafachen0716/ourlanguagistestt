@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <!-- Icons -->
   <link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" />
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
     :root{
@@ -72,6 +73,16 @@
     .btn{display:inline-flex;align-items:center;gap:.4rem;border:1px solid #2a2c30;background:var(--chip);color:var(--text);padding:.4rem .7rem;border-radius:999px;cursor:pointer}
     .btn:hover{border-color:#3a3d43}
 
+    #btnShowFav.active {
+      background-color: #fdd;   /* 背景顏色變淡紅 */
+      color: #c00;              /* 文字變紅 */
+      border: 1px solid #c00;   /* 邊框紅色 */
+    }
+
+    #btnShowFav.active i {
+      color: #c00;              /* icon 顏色也變紅 */
+    }
+
     .layout{display:grid;grid-template-columns: 360px 1fr; gap:0; height:100%;}
     @media (max-width: 1000px){.layout{grid-template-columns:1fr}}
 
@@ -118,6 +129,12 @@
     .list{display:grid;gap:.6rem;padding:.8rem .9rem}
     .card{background:var(--card);border:1px solid #22252b;border-radius:16px;padding:.7rem}
     .card h3{margin:.2rem 0 .1rem;font-size:1rem}
+    .card .desc-scroll {
+      max-height: 100px;   /* 可以調整高度 */
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
     .meta{font-size:.85rem;color:var(--muted)}
     .row{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
     .fav{cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;font-size:.9rem}
@@ -137,6 +154,12 @@
       object-fit: cover;     /* 避免圖片變形 */
       max-height: 200px;     /* 手機限制高度 */
     }
+
+  .popup .desc-scroll {
+    max-height: 100px;   /* 控制高度，可調整 */
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
 
     .info {
       display: grid;
@@ -253,10 +276,22 @@ footer a, footer span {
           <input id="q" type="search" placeholder="搜尋：活動名稱 / 城市 / 語言" />
           <button class="btn" id="btnClear"><i class="ti ti-x"></i>清除</button>
         </div>
-        <div style="margin-top:.6rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-          <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
-          <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
-        </div>
+        <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <label class="toggle"><input type="checkbox" id="toggleThisWeek"> 只看「本週」</label>
+            <span class="badge" id="thisWeekBadge">本週區間載入中…</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
+            <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+            <label>自訂區間：</label>
+            <input type="date" id="customStart">
+            <input type="date" id="customEnd">
+            <button class="btn" id="btnApplyCustom">套用</button>
+          </div>
+        </div>        
       </div>
 
       <div class="section">
@@ -327,6 +362,76 @@ footer a, footer span {
   const fmtBadge = (d) => d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'})
   $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
 
+
+  function getThisWeekRange(){
+  const now = new Date();
+  const tzNow = new Date(now.toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+  const day = tzNow.getDay(); // 0=Sun..6=Sat
+  const thisMon = new Date(tzNow); 
+  thisMon.setDate(tzNow.getDate() - ((day+6)%7)); // 找到本週一
+  thisMon.setHours(0,0,0,0);
+  const thisSun = new Date(thisMon);
+  thisSun.setDate(thisMon.getDate()+6);
+  thisSun.setHours(23,59,59,999);
+  return {start:thisMon, end:thisSun};
+  }
+
+  function filterEventsByDateRange(start, end){
+    console.log("📅 篩選日期區間：", start.toISOString(), "～", end.toISOString());
+    const filtered = allEvents.filter(ev=>{
+      const d = toDate(ev.date);
+      return d >= start && d <= end;
+    });
+    console.log("✅ 篩選後活動數量：", filtered.length);
+    renderEvents(filtered);
+  }
+
+  const thisWeek = getThisWeekRange();
+  $('#thisWeekBadge').textContent = `本週：${fmtBadge(thisWeek.start)}–${fmtBadge(thisWeek.end)}`;
+  $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
+
+  // 綁定事件
+  $('#toggleThisWeek').addEventListener('change', e=>{
+    if(e.target.checked){
+      $('#toggleNextWeek').checked = false;
+      filterEventsByDateRange(thisWeek.start, thisWeek.end);
+    } else {
+      // 如果兩個都沒勾 → 顯示全部
+      if(!$('#toggleThisWeek').checked && !$('#toggleNextWeek').checked){
+        renderEvents(allEvents);
+      }
+    }
+  });
+
+  $('#toggleNextWeek').addEventListener('change', e=>{
+    if(e.target.checked){
+      $('#toggleThisWeek').checked = false;
+      filterEventsByDateRange(nextWeek.start, nextWeek.end);
+    } else {
+      // 如果兩個都沒勾 → 顯示全部
+      if(!$('#toggleThisWeek').checked && !$('#toggleNextWeek').checked){
+        renderEvents(allEvents);
+      }
+    }
+  });
+
+
+  $('#btnApplyCustom').addEventListener('click', ()=>{
+    const startVal = $('#customStart').value;
+    const endVal = $('#customEnd').value;
+    if(!startVal || !endVal){
+      alert("請選擇開始與結束日期！");
+      return;
+    }
+    const start = new Date(startVal+'T00:00:00+08:00');
+    const end = new Date(endVal+'T23:59:59+08:00');
+    $('#toggleThisWeek').checked = false;
+    $('#toggleNextWeek').checked = false;
+    filterEventsByDateRange(start, end);
+  });
+
+
+
   // ======= 🗺️ Leaflet 地圖與底圖 =======
   const isMobile = window.innerWidth < 768;
 
@@ -369,7 +474,7 @@ footer a, footer span {
   map.setView([23.7, 121.0], 7);
 
   // 群聚
-  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 30 });
+  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 25 });
   map.addLayer(cluster);
 
   // ======= ⭐ 我的最愛（localStorage） =======
@@ -399,19 +504,18 @@ footer a, footer span {
     if(!SHEET_ID || SHEET_ID === 'YOUR_SHEET_ID') return null;
     const url = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSNEpCquK6h5mnmoZDPiQtCmg_BSzDdo9SwFpL1-ZcaduHDnhRUeUd2YHsGXIYqlmF14-ValKiej2kH/pub?output=csv`;
 
-    const res = await fetch(url);
-    const text = await res.text();
-
-    // 解析 CSV
-    const lines = text.trim().split('\n');
-    const cols = lines.shift().split(','); // 第一行是欄位
-    const rows = lines.map(line => {
-      const cells = line.split(',');
-      return Object.fromEntries(cells.map((c,i)=>[cols[i], c]));
+    return new Promise((resolve, reject) => {
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          console.log(results.data); // ← 確認欄位有正確解析
+          resolve(results.data);
+        },
+        error: reject
+      });
     });
-
-    console.log(rows);
-    return rows;
   }
 
 
@@ -445,29 +549,40 @@ footer a, footer span {
     return bag.includes(q.toLowerCase());
   }
 
-  function buildPopup(rec){
-    const fee = fmtCurrency(rec.fee);
-    const signup = rec.signup_url ? `<a href="${rec.signup_url}" target="_blank" rel="noopener">前往報名</a>` : '—';
-    const org = rec.organizer ? `<span class="badge">主辦：${rec.organizer}</span>` : '';
-    const time = [rec.date, rec.start_time, rec.end_time].filter(Boolean).join(' ');
-    const html = `
-      <div class="popup">
-        <div class="info">
-          <div class="line"><strong>${rec.title}</strong></div>
-          <div class="line meta">${time}</div>
-          <div class="line meta">${rec.city || ''} ${rec.address || ''}</div>
-          <div class="line">語言：<span class="badge">${rec.languages || '—'}</span></div>
-          <div class="line">費用：${fee}</div>
-          <div class="line">報名：${signup}</div>
-          <div class="line">${org}</div>
-          <div class="line" style="white-space:pre-wrap">${rec.description || ''}</div>
-          <div class="row">
-            <span class="fav" data-id="${rec.id}"><i class="ti ${isFav(rec.id)?'ti-heart-filled':'ti-heart'}"></i> 加入最愛</span>
-          </div>
-        </div>
-      </div>`;
-    return html;
+function buildPopup(rec) {
+  const fee = fmtCurrency(rec.fee);
+  const signup = rec.signup_url ? `<a href="${rec.signup_url}" target="_blank" rel="noopener">前往報名</a>` : '—';
+  const org = rec.organizer ? `<span class="badge">主辦：${rec.organizer}</span>` : '';
+  const time = [rec.date, rec.start_time, rec.end_time].filter(Boolean).join(' ');
+
+  // description 處理，截斷 100 字
+  let desc = rec.description || '';
+  if (desc.length > 100) {
+    desc = desc.substring(0, 100) + '...';
   }
+
+  const html = `
+    <div class="popup">
+      <div class="info">
+        <div class="line"><strong>${rec.title}</strong></div>
+        <div class="line meta">${time}</div>
+        <div class="line meta">${rec.city || ''} ${rec.address || ''}</div>
+        <div class="line">語言：<span class="badge">${rec.languages || '—'}</span></div>
+        <div class="line">費用：${fee}</div>
+        <div class="line">報名：${signup}</div>
+        <div class="line">${org}</div>
+        <div class="line desc-scroll">${desc}</div>
+        <div class="row">
+          <span class="fav" data-id="${rec.id}">
+            <i class="ti ${isFav(rec.id) ? 'ti-heart-filled' : 'ti-heart'}"></i> 加入最愛
+          </span>
+        </div>
+      </div>
+    </div>`;
+  return html;
+}
+
+
 
   const gatheringIcon = L.icon({//聚會縮圖圖片
     iconUrl: 'gatherings.png', // 圖片路徑
@@ -554,6 +669,7 @@ footer a, footer span {
 
 
     // ======= 線上活動：單獨列表顯示 =======
+    // ======= 線上活動：單獨列表顯示 =======
     if(online.length){
       const onlineHeader = document.createElement('div');
       onlineHeader.className = 'section';
@@ -564,6 +680,13 @@ footer a, footer span {
         const card = document.createElement('div');
         card.className = 'card';
         card.style.backgroundColor = '#2b2d33'; // 不同底色，區分線上活動
+
+        // 處理 description，只取前 100 字
+        let desc = r.description || '';
+        if (desc.length > 100) {
+          desc = desc.substring(0, 100) + '...';
+        }
+
         card.innerHTML = `
           <div class="row">
             <h3>${r.title}</h3>
@@ -572,12 +695,19 @@ footer a, footer span {
           <div class="meta">${r.city || ''}・${r.date || ''} ${r.start_time? '• '+r.start_time: ''}</div>
           <div class="meta">語言：${r.languages || '—'}｜費用：${fmtCurrency(r.fee)}</div>
           <div class="meta">報名：${r.signup_url? `<a href="${r.signup_url}" target="_blank" rel="noopener">前往報名</a>` : '—'}</div>
-          <div class="line" style="white-space:pre-wrap">${r.description || ''}</div>
+          <div class="line desc-scroll">${desc || ''}</div>
         `;
-        card.querySelector('.fav').addEventListener('click', ev=>{ ev.stopPropagation(); toggleFav(r.id); renderList(); });
+
+        card.querySelector('.fav').addEventListener('click', ev=>{
+          ev.stopPropagation();
+          toggleFav(r.id);
+          renderList();
+        });
+
         $('#cards').appendChild(card);
       }
     }
+
 
     updateFavIcons();
     renderFavList();
@@ -670,7 +800,7 @@ footer a, footer span {
           organizer: c["主辦人 organizer"],
           //cover_image_url: c["封面圖片"] || '',
           updated_at: c["更新時間"] || '',
-          languages: c["語言 languages"] || ''
+          languages: c["語言 languages"] || '',
         };
       }).filter(r => r.lat && r.lng);
 
