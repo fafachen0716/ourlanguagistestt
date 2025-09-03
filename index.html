@@ -276,10 +276,22 @@ footer a, footer span {
           <input id="q" type="search" placeholder="搜尋：活動名稱 / 城市 / 語言" />
           <button class="btn" id="btnClear"><i class="ti ti-x"></i>清除</button>
         </div>
-        <div style="margin-top:.6rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-          <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
-          <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
-        </div>
+        <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <label class="toggle"><input type="checkbox" id="toggleThisWeek"> 只看「本週」</label>
+            <span class="badge" id="thisWeekBadge">本週區間載入中…</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <label class="toggle"><input type="checkbox" id="toggleNextWeek"> 只看「下週」</label>
+            <span class="badge" id="nextWeekBadge">下週區間載入中…</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+            <label>自訂區間：</label>
+            <input type="date" id="customStart">
+            <input type="date" id="customEnd">
+            <button class="btn" id="btnApplyCustom">套用</button>
+          </div>
+        </div>        
       </div>
 
       <div class="section">
@@ -350,6 +362,45 @@ footer a, footer span {
   const fmtBadge = (d) => d.toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'})
   $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
 
+
+  function getThisWeekRange(){
+  const now = new Date();
+  const tzNow = new Date(now.toLocaleString('en-US',{timeZone:'Asia/Taipei'}));
+  const day = tzNow.getDay(); // 0=Sun..6=Sat
+  const thisMon = new Date(tzNow); 
+  thisMon.setDate(tzNow.getDate() - ((day+6)%7)); // 找到本週一
+  thisMon.setHours(0,0,0,0);
+  const thisSun = new Date(thisMon);
+  thisSun.setDate(thisMon.getDate()+6);
+  thisSun.setHours(23,59,59,999);
+  return {start:thisMon, end:thisSun};
+  }
+
+
+
+
+
+  const thisWeek = getThisWeekRange();
+  $('#thisWeekBadge').textContent = `本週：${fmtBadge(thisWeek.start)}–${fmtBadge(thisWeek.end)}`;
+  $('#nextWeekBadge').textContent = `下週：${fmtBadge(nextWeek.start)}–${fmtBadge(nextWeek.end)}`;
+
+ 
+  // === 全域日期篩選狀態（null 代表不套用日期篩選）===
+  let activeRange = null; // { start: Date, end: Date } 或 null
+
+  function setActiveRange(start, end){
+    activeRange = (start && end) ? { start, end } : null;
+  }
+
+  function inActiveRange(dateStr){
+    if(!activeRange) return true;      // 不篩日期
+    if(!dateStr)    return false;      // 沒日期就不顯示
+    const d = toDate(dateStr);
+    return d >= activeRange.start && d <= activeRange.end;
+  }
+
+
+
   // ======= 🗺️ Leaflet 地圖與底圖 =======
   const isMobile = window.innerWidth < 768;
 
@@ -392,7 +443,7 @@ footer a, footer span {
   map.setView([23.7, 121.0], 7);
 
   // 群聚
-  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 30 });
+  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius: 20 });
   map.addLayer(cluster);
 
   // ======= ⭐ 我的最愛（localStorage） =======
@@ -456,10 +507,6 @@ footer a, footer span {
   let records = [];
   let markers = [];
 
-  function withinNextWeek(rec){
-    const d = toDate(rec.date);
-    return d >= nextWeek.start && d <= nextWeek.end;
-  }
 
   function matchQuery(rec, q){
     if(!q) return true;
@@ -504,7 +551,7 @@ function buildPopup(rec) {
 
   const gatheringIcon = L.icon({//聚會縮圖圖片
     iconUrl: 'gatherings.png', // 圖片路徑
-    iconSize: [60, 60],        // 圖標大小，可依需求調整
+    iconSize: [45, 45],        // 圖標大小，可依需求調整
     iconAnchor: [16, 32],      // 圖標的「尖端」對應到經緯度的位置
     popupAnchor: [0, -32]      // popup 相對圖標的位置
   });
@@ -528,15 +575,17 @@ function buildPopup(rec) {
 
   function renderList(){
   const q = $('#q').value.trim();
-  const onlyNext = $('#toggleNextWeek').checked;
   const onlyFav = $('#btnShowFav').dataset.active === '1';
 
   // 清除
   cluster.clearLayers(); markers = [];
   $('#cards').innerHTML = '';
 
-  const filtered = records.filter(r => (!onlyNext || withinNextWeek(r)) && matchQuery(r,q) && (!onlyFav || isFav(r.id)));
-
+  const filtered = records.filter(r =>
+  inActiveRange(r.date) &&
+  matchQuery(r, q) &&
+  (!onlyFav || isFav(r.id))
+  );
   // 將線上活動與線下活動分開
   const online = filtered.filter(r => !r.lat || !r.lng);
   const offline = filtered.filter(r => r.lat && r.lng);
@@ -645,10 +694,59 @@ function buildPopup(rec) {
     // 搜尋與篩選事件
     $('#q').addEventListener('input', renderList);
     $('#btnClear').addEventListener('click', ()=>{ $('#q').value=''; renderList(); });
-    $('#toggleNextWeek').addEventListener('change', renderList);
 
     // 僅顯示最愛切換
     $('#btnShowFav').addEventListener('click', (e)=>{ const on = e.currentTarget.dataset.active === '1'; e.currentTarget.dataset.active = on? '0':'1'; e.currentTarget.classList.toggle('active'); renderList(); });
+
+    //只看本週，下週，自訂區間：
+
+    // 只看本週
+    $('#toggleThisWeek').addEventListener('change', e => {
+      if (e.target.checked) {
+        $('#toggleNextWeek').checked = false;
+        setActiveRange(thisWeek.start, thisWeek.end);
+      } else {
+        // 若兩個 checkbox 都沒勾、且沒有自訂區間，就清除篩選
+        if (!$('#toggleNextWeek').checked && !$('#customStart').value && !$('#customEnd').value) {
+          setActiveRange(null, null);
+        }
+      }
+      renderList();
+    });
+
+    // 只看下週
+    $('#toggleNextWeek').addEventListener('change', e => {
+      if (e.target.checked) {
+        $('#toggleThisWeek').checked = false;
+        setActiveRange(nextWeek.start, nextWeek.end);
+      } else {
+        if (!$('#toggleThisWeek').checked && !$('#customStart').value && !$('#customEnd').value) {
+          setActiveRange(null, null);
+        }
+      }
+      renderList();
+    });
+
+    // 自訂區間套用
+    $('#btnApplyCustom').addEventListener('click', () => {
+      const startVal = $('#customStart').value;
+      const endVal   = $('#customEnd').value;
+      if (!startVal || !endVal) {
+        alert('請選擇開始與結束日期！');
+        return;
+      }
+      const start = new Date(startVal + 'T00:00:00+08:00');
+      const end   = new Date(endVal   + 'T23:59:59+08:00');
+
+      setActiveRange(start, end);
+
+      // 自訂區間與 checkbox 互斥
+      $('#toggleThisWeek').checked = false;
+      $('#toggleNextWeek').checked = false;
+
+      renderList();
+    });
+
 
     // sidebar收合
 
@@ -737,6 +835,8 @@ function buildPopup(rec) {
   $('#imgModal').addEventListener('click', ()=> $('#imgModal').classList.remove('open'));
 
   init();
+  map.setView([23.7, 121.0], 7);
+
   </script>
 </body>
 </html>
