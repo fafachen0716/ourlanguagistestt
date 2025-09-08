@@ -837,7 +837,7 @@ function buildPopup(rec) {
           updated_at: c["更新時間"] || '',
           languages: c["語言 languages"] || '',
         };
-      }).filter(r => r.lat && r.lng);
+      });
 
       }else{
         records = SAMPLE;
