@@ -506,17 +506,7 @@ footer a, footer span {
 
 
 
-// ======= 🛰️ 判斷線上或線下活動 =======
-function detectOnlineOffline(record) {
-  const text = (record.address || record.city || "").toLowerCase();
 
-  const keywords = ["線上", "online", "zoom", "google meet", "teams", "skype"];
-  const isOnline = keywords.some(k => text.includes(k));
-
-  const status = isOnline ? "線上活動" : "線下活動";
-  console.log(`📝 活動《${record.title}》判斷為：${status}`);
-  return status;
-}
 
 
   let records = [];
@@ -605,6 +595,8 @@ function buildPopup(rec) {
   function hasCoords(r) {
   const lat = parseFloat(r.lat);
   const lng = parseFloat(r.lng);
+  console.log("lat:",lat)
+  console.log("lng:",lng)
   return !isNaN(lat) && !isNaN(lng);
   }
 
@@ -621,7 +613,6 @@ function buildPopup(rec) {
   // ======= 線下活動：地圖標記與卡片 =======
   for(const r of offline){
     // 只在有經緯度時才新增 marker
-    const status = detectOnlineOffline(r);
     let marker = null;
     const lat = parseFloat(r.lat);
     const lng = parseFloat(r.lng);
