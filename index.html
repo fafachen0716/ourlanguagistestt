@@ -602,9 +602,15 @@ function buildPopup(rec) {
   (!onlyFav || isFav(r.id))
   );
   // 將線上活動與線下活動分開
-  const online = filtered.filter(r => !r.lat || !r.lng);
-  const offline = filtered.filter(r => r.lat && r.lng);
-  
+  function hasCoords(r) {
+  const lat = parseFloat(r.lat);
+  const lng = parseFloat(r.lng);
+  return !isNaN(lat) && !isNaN(lng);
+  }
+
+  const offline = filtered.filter(r => hasCoords(r));    // 有座標 → 線下
+  const online  = filtered.filter(r => !hasCoords(r));   // 沒座標 → 線上
+
   // 排序：特定日期在前
   offline.sort((a,b)=>{
     if(a.date && !b.date) return -1;
