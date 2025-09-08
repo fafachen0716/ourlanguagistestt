@@ -405,7 +405,7 @@ footer a, footer span {
   const isMobile = window.innerWidth < 768;
 
   const map = L.map('map', { 
-    //zoomControl: false, 
+    zoomControl: false, 
     center: [23.7, 121.0],  // 👈 預設中心點
     minZoom: 5, 
     maxZoom: 19,
@@ -413,7 +413,7 @@ footer a, footer span {
     //tap: !isMobile,        // 手機關閉點擊拖曳 bug
     //scrollWheelZoom: !isMobile // 手機關閉滾輪縮放
   });  
-  L.control.zoom({ position:'bottomright' }).addTo(map);
+  //L.control.zoom({ position:'bottomright' }).addTo(map);
 
   // Leaflet 原本的底圖
   const baseLayers = {
@@ -482,7 +482,7 @@ footer a, footer span {
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-          console.log(results.data); // ← 確認欄位有正確解析
+          //console.log(results.data); // ← 確認欄位有正確解析
           resolve(results.data);
         },
         error: reject
@@ -598,8 +598,8 @@ function buildPopup(rec) {
   function hasCoords(r) {
   const lat = parseFloat(r.lat);
   const lng = parseFloat(r.lng);
-  console.log("lat:",lat)
-  console.log("lng:",lng)
+  // console.log("lat:",lat)
+  // console.log("lng:",lng)
   return !isNaN(lat) && !isNaN(lng);
   }
 
@@ -650,7 +650,10 @@ function buildPopup(rec) {
     $('#cards').appendChild(card);
   }
 
-
+    console.log(online)
+    for(const r of online){
+    console.log(r)
+    }
     // ======= 線上活動：單獨列表顯示 =======
     // ======= 線上活動：單獨列表顯示 =======
     if(online.length){
